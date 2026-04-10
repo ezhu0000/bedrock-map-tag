@@ -7,7 +7,7 @@
 打开 AWS CloudShell，直接运行以下命令下载并执行脚本：
 
 ```bash
-curl -O https://raw.githubusercontent.com/ezhu0000/bedrock-map-tag/main/bedrock-map-tag/bedrock-tag-deploy.sh
+curl -O https://raw.githubusercontent.com/ezhu0000/bedrock-map-tag/main/bedrock-tag-deploy.sh
 chmod +x bedrock-tag-deploy.sh
 ./bedrock-tag-deploy.sh
 ```
