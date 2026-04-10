@@ -8,6 +8,8 @@
 
 ```bash
 curl -O https://raw.githubusercontent.com/ezhu0000/bedrock-map-tag/main/bedrock-tag-deploy.sh
+# 如需修改标签值，请先编辑脚本中的 tags 部分，再执行
+
 chmod +x bedrock-tag-deploy.sh
 ./bedrock-tag-deploy.sh
 ```
@@ -26,9 +28,9 @@ chmod +x bedrock-tag-deploy.sh
 ```yaml
 tags:
   - key: map-migrated
-    value: migEDQGFZM9BB   # ← 改这里
+    value: migEDQGF-DEMO   # ← 改这里
   - key: Tagowner
-    value: CDS-MAP          # ← 改这里
+    value: CDS-MAP         
   - key: environment
     value: production
 ```
