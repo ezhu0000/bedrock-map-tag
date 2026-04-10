@@ -21,6 +21,18 @@ chmod +x bedrock-tag-deploy.sh
 - 为每个 Profile 打上 MAP 标签
 - 验证标签并输出汇总结果
 
+## 清理
+
+如需删除所有已创建的 Inference Profile：
+
+```bash
+curl -O https://raw.githubusercontent.com/ezhu0000/bedrock-map-tag/main/bedrock-tag-cleanup.sh
+chmod +x bedrock-tag-cleanup.sh
+./bedrock-tag-cleanup.sh
+```
+
+执行前会有确认提示，输入 `yes` 才会删除。
+
 ## 修改标签值
 
 下载脚本后，编辑 tags 部分再执行：
