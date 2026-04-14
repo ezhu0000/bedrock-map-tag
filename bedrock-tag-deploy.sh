@@ -66,7 +66,7 @@ for REGION in "${US_REGIONS[@]}"; do
 region: ${REGION}
 tags:
   - key: map-migrated
-    value: migEDQGF-DEMO
+    value: migDBLKHQS3LO
   - key: Tagowner
     value: CDS-MAP
   - key: environment
