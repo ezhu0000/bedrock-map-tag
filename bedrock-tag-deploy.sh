@@ -78,6 +78,12 @@ bedrock-profiles:
   - name: globalclaudesonnet46
     model_type: inference
     model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/global.anthropic.claude-sonnet-4-6
+  - name: usclaudeopus47
+    model_type: inference
+    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/us.anthropic.claude-opus-4-7
+  - name: globalclaudeopus47
+    model_type: inference
+    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/global.anthropic.claude-opus-4-7
   - name: usclaudeopus46
     model_type: inference
     model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/us.anthropic.claude-opus-4-6-v1
