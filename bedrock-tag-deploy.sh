@@ -2,12 +2,12 @@
 # ============================================================
 # AWS Bedrock Inference Profile 创建 & 打标签 一键脚本
 # 支持多美国区域：us-east-1 / us-east-2 / us-west-2
+# 智能幂等：已存在的跳过，只创建缺少的
 # 适用于 AWS CloudShell (Amazon Linux 2023)
 # ============================================================
 
 set -e
 
-# ---------- 颜色输出 ----------
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
@@ -19,160 +19,109 @@ warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 section() { echo -e "\n${CYAN}========== $1 ==========${NC}"; }
 
-# ---------- 目标区域列表（美国）----------
+# ---------- 目标区域 ----------
 US_REGIONS=("us-east-1" "us-east-2" "us-west-2")
 
-# ---------- 1. 获取当前账号 ID ----------
+# ---------- 标签（按需修改） ----------
+TAG_MAP_MIGRATED="migDBLKHQS3LO"
+TAG_OWNER="CDS-MAP"
+TAG_ENV="production"
+
+# ---------- 模型列表（name=profile名称, suffix=ARN中inference-profile/后面的部分） ----------
+# 格式: "name|suffix"
+MODELS=(
+  "usclaudesonnet46|us.anthropic.claude-sonnet-4-6"
+  "globalclaudesonnet46|global.anthropic.claude-sonnet-4-6"
+  "usclaudeopus47|us.anthropic.claude-opus-4-7"
+  "globalclaudeopus47|global.anthropic.claude-opus-4-7"
+  "usclaudeopus46|us.anthropic.claude-opus-4-6-v1"
+  "globalclaudeopus46|global.anthropic.claude-opus-4-6-v1"
+  "usclaudeopus45|us.anthropic.claude-opus-4-5-20251101-v1:0"
+  "globalclaudeopus45|global.anthropic.claude-opus-4-5-20251101-v1:0"
+  "usclaudehaiku45|us.anthropic.claude-haiku-4-5-20251001-v1:0"
+  "globalclaudehaiku45|global.anthropic.claude-haiku-4-5-20251001-v1:0"
+  "usclaudesonnet45|us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+  "globalclaudesonnet45|global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+  "usclaudeopus41|us.anthropic.claude-opus-4-1-20250805-v1:0"
+  "usclaudeopus4|us.anthropic.claude-opus-4-20250514-v1:0"
+  "usclaudesonnet4|us.anthropic.claude-sonnet-4-20250514-v1:0"
+  "globalclaudesonnet4|global.anthropic.claude-sonnet-4-20250514-v1:0"
+)
+
+# ---------- 1. 获取账号 ID ----------
 section "获取 AWS 账号信息"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text) \
   || error "无法获取 Account ID，请确认 CloudShell 已登录正确账号"
 info "Account ID : $ACCOUNT_ID"
-info "将在以下区域创建 Profile: ${US_REGIONS[*]}"
+info "目标区域   : ${US_REGIONS[*]}"
+info "模型数量   : ${#MODELS[@]}"
 
-# ---------- 2. 安装依赖 ----------
-section "安装系统依赖"
-sudo yum install -y git -q
-info "git 就绪"
-
-# ---------- 3. Clone 工具仓库 ----------
-section "准备工具仓库"
-TOOL_DIR="sample-bedrock-inference-profile-mgmt-tool"
-if [ -d "$TOOL_DIR" ]; then
-  warn "目录 $TOOL_DIR 已存在，执行 git pull..."
-  git -C "$TOOL_DIR" pull --quiet
-else
-  git clone https://github.com/aws-samples/sample-bedrock-inference-profile-mgmt-tool.git
-fi
-cd "$TOOL_DIR"
-
-# ---------- 4. Python 虚拟环境 ----------
-section "准备 Python 环境"
-python3 -m venv venv
-source venv/bin/activate
-pip install -q -r requirements.txt
-info "依赖安装完成"
-
-# ---------- 5. 按区域循环执行 ----------
-FAILED_REGIONS=()
+# ---------- 2. 按区域处理 ----------
+TOTAL_CREATED=0
+TOTAL_SKIPPED=0
+TOTAL_FAILED=0
 
 for REGION in "${US_REGIONS[@]}"; do
   section "处理区域: $REGION"
 
-  # 生成该区域的 yaml 文件
-  YAML_FILE="bedrock-profiles-${REGION}.yaml"
-  info "生成 $YAML_FILE ..."
-
-  cat > "$YAML_FILE" << YAML
-region: ${REGION}
-tags:
-  - key: map-migrated
-    value: migDBLKHQS3LO
-  - key: Tagowner
-    value: CDS-MAP
-  - key: environment
-    value: production
-bedrock-profiles:
-  - name: usclaudesonnet46
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/us.anthropic.claude-sonnet-4-6
-  - name: globalclaudesonnet46
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/global.anthropic.claude-sonnet-4-6
-  - name: usclaudeopus47
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/us.anthropic.claude-opus-4-7
-  - name: globalclaudeopus47
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/global.anthropic.claude-opus-4-7
-  - name: usclaudeopus46
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/us.anthropic.claude-opus-4-6-v1
-  - name: globalclaudeopus46
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/global.anthropic.claude-opus-4-6-v1
-  - name: usclaudeopus45
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/us.anthropic.claude-opus-4-5-20251101-v1:0
-  - name: globalclaudeopus45
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/global.anthropic.claude-opus-4-5-20251101-v1:0
-  - name: usclaudehaiku45
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0
-  - name: globalclaudehaiku45
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0
-  - name: usclaudesonnet45
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0
-  - name: globalclaudesonnet45
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/global.anthropic.claude-sonnet-4-5-20250929-v1:0
-  - name: usclaudeopus41
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/us.anthropic.claude-opus-4-1-20250805-v1:0
-  - name: usclaudeopus4
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/us.anthropic.claude-opus-4-20250514-v1:0
-  - name: usclaudesonnet4
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0
-  - name: globalclaudesonnet4
-    model_type: inference
-    model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/global.anthropic.claude-sonnet-4-20250514-v1:0
-YAML
-
-  # 执行工具前检查：该区域是否已存在 Application Inference Profile
-  EXISTING=$(aws bedrock list-inference-profiles \
+  # 获取该区域已有的 Application Inference Profile 名称列表
+  EXISTING_NAMES=$(aws bedrock list-inference-profiles \
     --region "$REGION" \
     --type-equals APPLICATION \
     --query 'inferenceProfileSummaries[].inferenceProfileName' \
-    --output text 2>/dev/null || true)
+    --output text 2>/dev/null || echo "")
 
-  if [ -n "$EXISTING" ]; then
-    warn "[$REGION] 已存在以下 Application Inference Profile，跳过创建（避免重复）："
-    echo "$EXISTING" | tr '\t' '\n' | sed 's/^/  - /'
-    continue
-  fi
+  CREATED=0
+  SKIPPED=0
+  FAILED=0
 
-  # 执行工具
-  info "[$REGION] 开始创建 Inference Profile 并打标签..."
-  if python3 bedrock_inference_profile_management_tool.py -f "./$YAML_FILE"; then
-    info "[$REGION] 创建完成 ✓"
-  else
-    warn "[$REGION] 执行失败，继续下一个区域"
-    FAILED_REGIONS+=("$REGION")
-    continue
-  fi
+  for MODEL_ENTRY in "${MODELS[@]}"; do
+    NAME="${MODEL_ENTRY%%|*}"
+    SUFFIX="${MODEL_ENTRY##*|}"
+    SOURCE_ARN="arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/${SUFFIX}"
 
-  # 验证：取最新 CSV 的第一条 ARN
-  CSV_FILE=$(ls -t inference_profiles_*.csv 2>/dev/null | head -1)
-  if [ -n "$CSV_FILE" ]; then
-    SAMPLE_ARN=$(awk -F',' 'NR==2{print $2}' "$CSV_FILE" | tr -d '"' | tr -d ' ')
-    if [ -n "$SAMPLE_ARN" ]; then
-      info "[$REGION] 验证标签: $SAMPLE_ARN"
-      if aws bedrock list-tags-for-resource \
-           --resource-arn "$SAMPLE_ARN" \
-           --region "$REGION" 2>/dev/null; then
-        info "[$REGION] 标签验证成功 ✓"
-      else
-        warn "[$REGION] 标签验证失败，请手动检查"
-      fi
+    # 检查是否已存在同名 profile
+    if echo "$EXISTING_NAMES" | grep -qw "$NAME"; then
+      info "  [跳过] $NAME 已存在"
+      SKIPPED=$((SKIPPED + 1))
+      continue
     fi
-    # 重命名 CSV 避免下次循环混淆
-    mv "$CSV_FILE" "${CSV_FILE%.csv}_${REGION}.csv"
-  fi
+
+    # 创建 profile
+    info "  [创建] $NAME ..."
+    RESULT=$(aws bedrock create-inference-profile \
+      --inference-profile-name "$NAME" \
+      --model-source copyFrom="$SOURCE_ARN" \
+      --tags \
+        key=map-migrated,value="$TAG_MAP_MIGRATED" \
+        key=Tagowner,value="$TAG_OWNER" \
+        key=environment,value="$TAG_ENV" \
+      --region "$REGION" \
+      --query 'inferenceProfileArn' \
+      --output text 2>&1) || true
+
+    if echo "$RESULT" | grep -q "arn:aws:bedrock"; then
+      info "  [成功] $NAME → $RESULT"
+      CREATED=$((CREATED + 1))
+    else
+      warn "  [失败] $NAME : $RESULT"
+      FAILED=$((FAILED + 1))
+    fi
+  done
+
+  info "[$REGION] 新建: $CREATED  跳过: $SKIPPED  失败: $FAILED"
+  TOTAL_CREATED=$((TOTAL_CREATED + CREATED))
+  TOTAL_SKIPPED=$((TOTAL_SKIPPED + SKIPPED))
+  TOTAL_FAILED=$((TOTAL_FAILED + FAILED))
 done
 
-# ---------- 6. 汇总结果 ----------
+# ---------- 3. 汇总 ----------
 section "执行汇总"
 info "Account ID : $ACCOUNT_ID"
-info "成功区域   : $(echo "${US_REGIONS[@]}" | tr ' ' '\n' | grep -v "$(IFS='|'; echo "${FAILED_REGIONS[*]}")" | tr '\n' ' ')"
-if [ ${#FAILED_REGIONS[@]} -gt 0 ]; then
-  warn "失败区域   : ${FAILED_REGIONS[*]}"
-  warn "请检查失败区域的模型是否已在该区域开通，或 IAM 权限是否足够"
+info "总计新建   : $TOTAL_CREATED"
+info "总计跳过   : $TOTAL_SKIPPED"
+if [ "$TOTAL_FAILED" -gt 0 ]; then
+  warn "总计失败   : $TOTAL_FAILED （模型可能在该区域不可用，或 IAM 权限不足）"
 else
-  info "所有区域执行成功 ✓"
+  info "总计失败   : 0 ✓"
 fi
-info "CSV 结果文件均在目录: $(pwd)"
-ls -1 inference_profiles_*.csv 2>/dev/null || true
