@@ -122,6 +122,19 @@ bedrock-profiles:
     model_id: arn:aws:bedrock:${REGION}:${ACCOUNT_ID}:inference-profile/global.anthropic.claude-sonnet-4-20250514-v1:0
 YAML
 
+  # 执行工具前检查：该区域是否已存在 Application Inference Profile
+  EXISTING=$(aws bedrock list-inference-profiles \
+    --region "$REGION" \
+    --type-equals APPLICATION \
+    --query 'inferenceProfileSummaries[].inferenceProfileName' \
+    --output text 2>/dev/null || true)
+
+  if [ -n "$EXISTING" ]; then
+    warn "[$REGION] 已存在以下 Application Inference Profile，跳过创建（避免重复）："
+    echo "$EXISTING" | tr '\t' '\n' | sed 's/^/  - /'
+    continue
+  fi
+
   # 执行工具
   info "[$REGION] 开始创建 Inference Profile 并打标签..."
   if python3 bedrock_inference_profile_management_tool.py -f "./$YAML_FILE"; then
