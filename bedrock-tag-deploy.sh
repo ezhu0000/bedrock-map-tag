@@ -19,13 +19,37 @@ warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 section() { echo -e "\n${CYAN}========== $1 ==========${NC}"; }
 
-# ---------- 目标区域 ----------
-US_REGIONS=("us-east-1" "us-east-2" "us-west-2")
+# ---------- 参数解析 ----------
+usage() {
+  echo "用法: $0 -m <map-migrated值> [-o <Tagowner>] [-e <environment>]"
+  echo "  -m  map-migrated 标签值（必填），例如: migDBLKHQS3LO"
+  echo "  -o  Tagowner 标签值（可选，默认: CDS-MAP）"
+  echo "  -e  environment 标签值（可选，默认: production）"
+  echo "示例: $0 -m migDBLKHQS3LO"
+  exit 1
+}
 
-# ---------- 标签（按需修改） ----------
-TAG_MAP_MIGRATED="migDBLKHQS3LO"
+TAG_MAP_MIGRATED=""
 TAG_OWNER="CDS-MAP"
 TAG_ENV="production"
+
+while getopts "m:o:e:h" opt; do
+  case $opt in
+    m) TAG_MAP_MIGRATED="$OPTARG" ;;
+    o) TAG_OWNER="$OPTARG" ;;
+    e) TAG_ENV="$OPTARG" ;;
+    h) usage ;;
+    *) usage ;;
+  esac
+done
+
+[ -z "$TAG_MAP_MIGRATED" ] && { error "缺少必填参数 -m <map-migrated值>，运行 $0 -h 查看帮助"; }
+
+# 打标签时间（UTC）
+TAG_TAGGED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# ---------- 目标区域 ----------
+US_REGIONS=("us-east-1" "us-east-2" "us-west-2")
 
 # ---------- 模型列表（name=profile名称, suffix=ARN中inference-profile/后面的部分） ----------
 # 格式: "name|suffix"
@@ -96,6 +120,7 @@ for REGION in "${US_REGIONS[@]}"; do
         key=map-migrated,value="$TAG_MAP_MIGRATED" \
         key=Tagowner,value="$TAG_OWNER" \
         key=environment,value="$TAG_ENV" \
+        key=tagged-at,value="$TAG_TAGGED_AT" \
       --region "$REGION" \
       --query 'inferenceProfileArn' \
       --output text 2>&1) || true
@@ -117,9 +142,11 @@ done
 
 # ---------- 3. 汇总 ----------
 section "执行汇总"
-info "Account ID : $ACCOUNT_ID"
-info "总计新建   : $TOTAL_CREATED"
-info "总计跳过   : $TOTAL_SKIPPED"
+info "Account ID    : $ACCOUNT_ID"
+info "map-migrated  : $TAG_MAP_MIGRATED"
+info "tagged-at     : $TAG_TAGGED_AT"
+info "总计新建      : $TOTAL_CREATED"
+info "总计跳过      : $TOTAL_SKIPPED"
 if [ "$TOTAL_FAILED" -gt 0 ]; then
   warn "总计失败   : $TOTAL_FAILED （模型可能在该区域不可用，或 IAM 权限不足）"
 else
