@@ -31,8 +31,8 @@ chmod +x bedrock-tag-deploy.sh
 
 示例：
 ```bash
-./bedrock-tag-deploy.sh -m migDBLKHQS3LO
-./bedrock-tag-deploy.sh -m migDBLKHQS3LO -o MyTeam -e staging
+./bedrock-tag-deploy.sh -m migDBLKH-DEMO
+./bedrock-tag-deploy.sh -m migDBLKH-DEMO -o MyTeam -e staging
 ```
 
 ## 清理
