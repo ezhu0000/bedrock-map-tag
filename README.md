@@ -11,15 +11,29 @@ curl -O https://raw.githubusercontent.com/ezhu0000/bedrock-map-tag/main/bedrock-
 # 如需修改标签值，请先编辑脚本中的 tags 部分，再执行
 
 chmod +x bedrock-tag-deploy.sh
-./bedrock-tag-deploy.sh
+./bedrock-tag-deploy.sh -m <map-migrated值>
 ```
 
 脚本会自动完成：
 - 获取当前账号 ID
-- 安装依赖、clone 工具仓库
 - 在 `us-east-1`、`us-east-2`、`us-west-2` 三个区域分别创建 Inference Profile
-- 为每个 Profile 打上 MAP 标签
-- 验证标签并输出汇总结果
+- 智能跳过已存在的 Profile，只创建缺少的
+- 为每个新建 Profile 打上 MAP 标签（含打标签时间）
+- 输出新建 / 跳过 / 失败汇总
+
+**参数说明：**
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `-m` | map-migrated 标签值（**必填**） | 无 |
+| `-o` | Tagowner 标签值（可选） | CDS-MAP |
+| `-e` | environment 标签值（可选） | production |
+
+示例：
+```bash
+./bedrock-tag-deploy.sh -m migDBLKHQS3LO
+./bedrock-tag-deploy.sh -m migDBLKHQS3LO -o MyTeam -e staging
+```
 
 ## 清理
 
@@ -35,17 +49,7 @@ chmod +x bedrock-tag-cleanup.sh
 
 ## 修改标签值
 
-下载脚本后，编辑 tags 部分再执行：
-
-```yaml
-tags:
-  - key: map-migrated
-    value: migEDQGF-DEMO   # ← 改这里
-  - key: Tagowner
-    value: CDS-MAP         
-  - key: environment
-    value: production
-```
+`-o` 和 `-e` 参数可直接在命令行覆盖，`map-migrated` 通过 `-m` 必填传入，无需修改脚本文件。
 
 ## 所需 IAM 权限（如果不想单独配置权限，可以直接使用管理员用户执行脚本）
 
