@@ -36,6 +36,7 @@ chmod +x bedrock-tag-deploy.sh
 ```
 
 ## 清理
+> ⚠️ **请谨慎使用清理功能！** 删除 Inference Profile 后，关联的 MAP 标签也会一并移除，且操作不可逆。建议先在测试账号中验证，确认无误后再在生产环境执行。
 
 如需删除所有已创建的 Inference Profile：
 
