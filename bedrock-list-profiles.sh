@@ -77,7 +77,7 @@ print('\t'.join([
     IFS=$'\t' read -r T_MAP T_OWNER T_ENV T_TIME <<< "$TAG_MAP"
 
     echo "${REGION},${NAME},${ARN},${STATUS},${MODEL_ARN},${T_MAP},${T_OWNER},${T_ENV},${T_TIME}" >> "$CSV_FILE"
-    info "  $NAME"
+    info "  $NAME  →  $ARN"
   done <<< "$PROFILES_TEXT"
 
   TOTAL=$((TOTAL + COUNT))
