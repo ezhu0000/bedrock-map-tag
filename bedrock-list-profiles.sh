@@ -56,43 +56,51 @@ for REGION in "${US_REGIONS[@]}"; do
   info "[$REGION] 找到 $COUNT 个 Profile，获取标签中..."
 
   # 逐条处理，获取标签
-  echo "$PROFILES_JSON" | python3 - << 'PYEOF'
-import sys, json, subprocess, os
+  TMPFILE=$(mktemp /tmp/profiles_XXXXXX.json)
+  echo "$PROFILES_JSON" > "$TMPFILE"
 
-data   = json.load(sys.stdin)
-region = os.environ["REGION"]
-csv    = os.environ["CSV_FILE"]
+  python3 -c "
+import sys, json, subprocess
 
-with open(csv, "a") as f:
+with open('$TMPFILE') as f:
+    data = json.load(f)
+
+region = '$REGION'
+csv    = '$CSV_FILE'
+
+with open(csv, 'a') as out:
     for p in data:
-        name      = p.get("name", "")
-        arn       = p.get("arn", "")
-        status    = p.get("status", "")
-        model_arn = p.get("modelArn", "")
+        name      = p.get('name', '')
+        arn       = p.get('arn', '')
+        status    = p.get('status', '')
+        model_arn = p.get('modelArn', '') or ''
 
-        # 获取标签
         try:
             result = subprocess.run(
-                ["aws", "bedrock", "list-tags-for-resource",
-                 "--resource-arn", arn, "--region", region,
-                 "--query", "tags", "--output", "json"],
+                ['aws', 'bedrock', 'list-tags-for-resource',
+                 '--resource-arn', arn, '--region', region,
+                 '--query', 'tags', '--output', 'json'],
                 capture_output=True, text=True, timeout=10
             )
             tags_list = json.loads(result.stdout) if result.returncode == 0 else []
-            tags = {t["key"]: t["value"] for t in tags_list}
+            tags = {t['key']: t['value'] for t in tags_list}
         except Exception:
             tags = {}
 
-        row = ",".join([
-            region, name, arn, status, model_arn,
-            tags.get("map-migrated", ""),
-            tags.get("Tagowner", ""),
-            tags.get("environment", ""),
-            tags.get("tagged-at", "")
+        def esc(v):
+            return '\"' + v.replace('\"', '\"\"') + '\"' if ',' in v or '\"' in v else v
+
+        row = ','.join([
+            esc(region), esc(name), esc(arn), esc(status), esc(model_arn),
+            esc(tags.get('map-migrated', '')),
+            esc(tags.get('Tagowner', '')),
+            esc(tags.get('environment', '')),
+            esc(tags.get('tagged-at', ''))
         ])
-        f.write(row + "\n")
-        print(f"  {name}")
-PYEOF
+        out.write(row + '\n')
+        print('  ' + name)
+"
+  rm -f "$TMPFILE"
 
   TOTAL=$((TOTAL + COUNT))
 done
