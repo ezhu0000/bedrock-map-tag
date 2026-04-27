@@ -8,7 +8,7 @@ set -e
 
 # 设置变量
 USERNAME="billing-viewer"
-POLICY_NAME="BillingViewerPolicy"
+POLICY_NAME="BillingViewerPolicy-$(date +%Y%m%d%H%M%S)"
 
 # 参数解析
 usage() {
