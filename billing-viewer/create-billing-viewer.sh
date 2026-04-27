@@ -46,60 +46,23 @@ echo "当前身份: $CURRENT_USER"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 echo "账户ID: $ACCOUNT_ID"
 
-# 检查IAM访问账单信息是否已激活
+# 检查 IAM 访问账单开关（该设置无 API 可查，需人工确认）
 echo ""
-echo "[INFO] 检查IAM访问账单信息状态..."
-
-check_billing_access() {
-  # 尝试检查权限
-  aws iam get-account-summary >/dev/null 2>&1
-  if [ $? -eq 0 ]; then
-    echo "[OK] IAM服务可访问"
-    # 尝试访问账单相关API来检查是否已激活
-    aws ce get-cost-and-usage \
-      --time-period Start=2024-01-01,End=2024-01-02 \
-      --granularity DAILY \
-      --metrics BlendedCost >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
-      echo "[OK] IAM访问账单信息可能已激活"
-      return 0
-    else
-      echo "[WARN] 无法确定IAM访问账单信息状态"
-      return 1
-    fi
-  else
-    echo "[ERROR] IAM服务访问失败"
-    return 1
-  fi
-}
-
-# 执行检查
-if ! check_billing_access; then
-  echo ""
-  echo "[IMPORTANT] 需要激活IAM访问账单信息"
-  echo "=================================================="
-  echo "由于AWS安全限制，此操作必须由root用户手动完成："
-  echo ""
-  echo "手动操作步骤："
-  echo "1. 使用root用户登录AWS控制台"
-  echo "   URL: https://console.aws.amazon.com/"
-  echo ""
-  echo "2. 点击右上角账户名 -> 选择 'Account'"
-  echo "   或直接访问: https://console.aws.amazon.com/billing/home#/account"
-  echo ""
-  echo "3. 滚动到 'IAM User and Role Access to Billing Information' 部分"
-  echo ""
-  echo "4. 点击 'Edit' 按钮"
-  echo ""
-  echo "5. 勾选 'Activate IAM Access' 复选框"
-  echo ""
-  echo "6. 点击 'Update' 按钮"
-  echo ""
-  echo "7. 确认看到 'IAM user/role access to billing information is activated' 消息"
-  echo ""
-  echo "请完成上述步骤后，按任意键继续..."
-  read -n 1 -s
-  echo ""
+echo "[INFO] 确认 IAM 访问账单信息开关"
+echo "=================================================="
+echo "IAM 用户查看账单需要 root 用户在控制台开启此开关。"
+echo "AWS 未提供 API 查询此开关状态，请手动确认："
+echo ""
+echo "  控制台路径: Account -> IAM User and Role Access to Billing Information"
+echo "  直达链接:   https://us-east-1.console.aws.amazon.com/billing/home#/account"
+echo ""
+echo "  如果显示 'Activated'，说明已开启，直接继续即可。"
+echo "  如果未开启，请点击 Edit -> 勾选 Activate IAM Access -> Update。"
+echo ""
+read -r -p "已确认开关已开启？(输入 yes 继续): " CONFIRM
+if [ "$CONFIRM" != "yes" ]; then
+  echo "[INFO] 已取消，请开启后重新运行脚本"
+  exit 0
 fi
 
 # 继续创建IAM用户
