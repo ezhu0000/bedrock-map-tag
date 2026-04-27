@@ -108,6 +108,15 @@ cat > /tmp/billing-policy.json << 'EOF'
       "Resource": "*"
     },
     {
+      "Sid": "AllowChangeOwnPassword",
+      "Effect": "Allow",
+      "Action": [
+        "iam:ChangePassword",
+        "iam:GetAccountPasswordPolicy"
+      ],
+      "Resource": "arn:aws:iam::*:user/${aws:username}"
+    },
+    {
       "Sid": "AllowPaymentInformation",
       "Effect": "Allow",
       "Action": [
