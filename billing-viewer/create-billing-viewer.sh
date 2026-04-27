@@ -1,6 +1,7 @@
 #!/bin/bash
 # ============================================================
 # 创建具有账单查看权限的 IAM 用户
+# 使用 AWS 托管策略 job-function/Billing
 # 适用于 AWS CloudShell
 # ============================================================
 
@@ -12,7 +13,6 @@ NC='\033[0m'
 
 # 设置变量
 USERNAME="billing-viewer"
-POLICY_NAME="BillingViewerPolicy-$(date +%Y%m%d%H%M%S)"
 
 # 参数解析
 usage() {
@@ -60,90 +60,41 @@ aws iam update-login-profile \
   --password-reset-required \
   >/dev/null 2>&1 || { echo "[ERROR] 密码设置失败"; exit 1; }
 
-echo "[3/4] 创建账单查看策略..."
-cat > /tmp/billing-policy.json << 'EOF'
+echo "[3/4] 附加 AWS 托管账单策略..."
+aws iam attach-user-policy \
+  --user-name "$USERNAME" \
+  --policy-arn "arn:aws:iam::aws:policy/job-function/Billing" \
+  >/dev/null 2>&1 || { echo "[ERROR] 账单策略附加失败"; exit 1; }
+
+echo "[4/4] 附加修改密码权限..."
+cat > /tmp/change-password-policy.json << 'EOF'
 {
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "AllowBillingConsoleAccess",
-      "Effect": "Allow",
-      "Action": ["aws-portal:ViewBilling", "aws-portal:ViewUsage"],
-      "Resource": "*"
-    },
-    {
-      "Sid": "AllowCostExplorerAccess",
-      "Effect": "Allow",
-      "Action": [
-        "ce:GetCostAndUsage", "ce:GetDimensionValues",
-        "ce:GetReservationCoverage", "ce:GetReservationPurchaseRecommendation",
-        "ce:GetReservationUtilization", "ce:GetUsageReport",
-        "ce:ListCostCategoryDefinitions", "ce:DescribeCostCategoryDefinition"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "AllowBudgetAccess",
-      "Effect": "Allow",
-      "Action": ["budgets:ViewBudget"],
-      "Resource": "*"
-    },
-    {
-      "Sid": "AllowBillingReportsAccess",
-      "Effect": "Allow",
-      "Action": [
-        "cur:DescribeReportDefinitions",
-        "billing:GetBillingData", "billing:GetBillingDetails",
-        "billing:GetBillingNotifications", "billing:GetBillingPreferences",
-        "billing:GetContractInformation", "billing:GetCredits",
-        "billing:GetIAMAccessPreference", "billing:GetSellerOfRecord",
-        "billing:ListBillingViews"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "AllowAccountInformation",
-      "Effect": "Allow",
-      "Action": ["account:GetAccountInformation"],
-      "Resource": "*"
-    },
-    {
-      "Sid": "AllowChangeOwnPassword",
       "Effect": "Allow",
       "Action": [
         "iam:ChangePassword",
         "iam:GetAccountPasswordPolicy"
       ],
       "Resource": "arn:aws:iam::*:user/${aws:username}"
-    },
-    {
-      "Sid": "AllowPaymentInformation",
-      "Effect": "Allow",
-      "Action": [
-        "payments:ListPaymentPreferences",
-        "payments:GetPaymentInstrument",
-        "payments:GetPaymentStatus"
-      ],
-      "Resource": "*"
     }
   ]
 }
 EOF
 
-POLICY_ARN="arn:aws:iam::${ACCOUNT_ID}:policy/${POLICY_NAME}"
+CHANGE_PWD_POLICY="AllowChangePassword-$(date +%Y%m%d%H%M%S)"
 aws iam create-policy \
-  --policy-name "$POLICY_NAME" \
-  --policy-document file:///tmp/billing-policy.json \
-  --description "Policy for viewing billing information and cost data" \
-  >/dev/null 2>&1 || { echo "[ERROR] 策略创建失败"; exit 1; }
+  --policy-name "$CHANGE_PWD_POLICY" \
+  --policy-document file:///tmp/change-password-policy.json \
+  >/dev/null 2>&1 || true
 
-echo "[4/4] 附加策略到用户..."
 aws iam attach-user-policy \
   --user-name "$USERNAME" \
-  --policy-arn "$POLICY_ARN" \
-  >/dev/null 2>&1 || { echo "[ERROR] 策略附加失败"; exit 1; }
+  --policy-arn "arn:aws:iam::${ACCOUNT_ID}:policy/${CHANGE_PWD_POLICY}" \
+  >/dev/null 2>&1 || true
 
-rm -f /tmp/billing-policy.json
+rm -f /tmp/change-password-policy.json
 
 echo ""
 echo -e "${GREEN}===================================================${NC}"
