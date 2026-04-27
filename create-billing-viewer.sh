@@ -8,8 +8,27 @@ set -e
 
 # 设置变量
 USERNAME="billing-viewer"
-PASSWORD="TempPassword123!"
 POLICY_NAME="BillingViewerPolicy"
+
+# 参数解析
+usage() {
+  echo "用法: $0 -p <密码>"
+  echo "  -p  IAM 用户登录密码（必填），需满足 AWS 密码策略"
+  echo "  -u  IAM 用户名（可选，默认: billing-viewer）"
+  echo "示例: $0 -p 'MyP@ssw0rd!'"
+  exit 1
+}
+
+while getopts "p:u:h" opt; do
+  case $opt in
+    p) PASSWORD="$OPTARG" ;;
+    u) USERNAME="$OPTARG" ;;
+    h) usage ;;
+    *) usage ;;
+  esac
+done
+
+[ -z "$PASSWORD" ] && { echo "[ERROR] 缺少必填参数 -p <密码>，运行 $0 -h 查看帮助"; exit 1; }
 
 echo "开始创建具有账单查看权限的IAM用户"
 echo "=================================================="
