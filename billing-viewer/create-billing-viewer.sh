@@ -37,11 +37,16 @@ ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text) \
 echo "[INFO] 账户ID: $ACCOUNT_ID"
 echo "[INFO] 开始创建 IAM 用户: $USERNAME"
 
-# 创建IAM用户
+# 创建IAM用户（已存在则加日期后缀）
+if aws iam get-user --user-name "$USERNAME" >/dev/null 2>&1; then
+  USERNAME="${USERNAME}-$(date +%m%d)"
+  echo "[INFO] 用户已存在，使用新用户名: $USERNAME"
+fi
+
 aws iam create-user \
   --user-name "$USERNAME" \
   --tags Key=Purpose,Value=BillingViewer Key=CreatedBy,Value=CLI Key=CreatedDate,Value="$(date +%Y-%m-%d)" \
-  >/dev/null 2>&1 || echo "[WARN] 用户可能已存在，继续..."
+  >/dev/null 2>&1 || { echo "[ERROR] 创建用户 $USERNAME 失败"; exit 1; }
 
 # 创建登录配置
 aws iam create-login-profile \
