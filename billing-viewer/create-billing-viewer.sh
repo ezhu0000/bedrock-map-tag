@@ -6,6 +6,10 @@
 
 set -e
 
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
 # 设置变量
 USERNAME="billing-viewer"
 POLICY_NAME="BillingViewerPolicy-$(date +%Y%m%d%H%M%S)"
@@ -34,21 +38,17 @@ done
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text) \
   || { echo "[ERROR] 无法获取AWS身份信息"; exit 1; }
 
-echo "[INFO] 账户ID: $ACCOUNT_ID"
-echo "[INFO] 开始创建 IAM 用户: $USERNAME"
-
-# 创建IAM用户（已存在则加日期后缀）
+echo "[1/4] 创建 IAM 用户..."
 if aws iam get-user --user-name "$USERNAME" >/dev/null 2>&1; then
   USERNAME="${USERNAME}-$(date +%m%d)"
-  echo "[INFO] 用户已存在，使用新用户名: $USERNAME"
+  echo "       用户已存在，使用: $USERNAME"
 fi
-
 aws iam create-user \
   --user-name "$USERNAME" \
   --tags Key=Purpose,Value=BillingViewer Key=CreatedBy,Value=CLI Key=CreatedDate,Value="$(date +%Y-%m-%d)" \
   >/dev/null 2>&1 || { echo "[ERROR] 创建用户 $USERNAME 失败"; exit 1; }
 
-# 创建登录配置
+echo "[2/4] 设置登录密码..."
 aws iam create-login-profile \
   --user-name "$USERNAME" \
   --password "$PASSWORD" \
@@ -58,9 +58,9 @@ aws iam update-login-profile \
   --user-name "$USERNAME" \
   --password "$PASSWORD" \
   --password-reset-required \
-  >/dev/null 2>&1 || echo "[WARN] 登录配置更新失败"
+  >/dev/null 2>&1 || { echo "[ERROR] 密码设置失败"; exit 1; }
 
-# 创建账单查看策略
+echo "[3/4] 创建账单查看策略..."
 cat > /tmp/billing-policy.json << 'EOF'
 {
   "Version": "2012-10-17",
@@ -68,33 +68,24 @@ cat > /tmp/billing-policy.json << 'EOF'
     {
       "Sid": "AllowBillingConsoleAccess",
       "Effect": "Allow",
-      "Action": [
-        "aws-portal:ViewBilling",
-        "aws-portal:ViewUsage"
-      ],
+      "Action": ["aws-portal:ViewBilling", "aws-portal:ViewUsage"],
       "Resource": "*"
     },
     {
       "Sid": "AllowCostExplorerAccess",
       "Effect": "Allow",
       "Action": [
-        "ce:GetCostAndUsage",
-        "ce:GetDimensionValues",
-        "ce:GetReservationCoverage",
-        "ce:GetReservationPurchaseRecommendation",
-        "ce:GetReservationUtilization",
-        "ce:GetUsageReport",
-        "ce:ListCostCategoryDefinitions",
-        "ce:DescribeCostCategoryDefinition"
+        "ce:GetCostAndUsage", "ce:GetDimensionValues",
+        "ce:GetReservationCoverage", "ce:GetReservationPurchaseRecommendation",
+        "ce:GetReservationUtilization", "ce:GetUsageReport",
+        "ce:ListCostCategoryDefinitions", "ce:DescribeCostCategoryDefinition"
       ],
       "Resource": "*"
     },
     {
       "Sid": "AllowBudgetAccess",
       "Effect": "Allow",
-      "Action": [
-        "budgets:ViewBudget"
-      ],
+      "Action": ["budgets:ViewBudget"],
       "Resource": "*"
     },
     {
@@ -102,14 +93,10 @@ cat > /tmp/billing-policy.json << 'EOF'
       "Effect": "Allow",
       "Action": [
         "cur:DescribeReportDefinitions",
-        "billing:GetBillingData",
-        "billing:GetBillingDetails",
-        "billing:GetBillingNotifications",
-        "billing:GetBillingPreferences",
-        "billing:GetContractInformation",
-        "billing:GetCredits",
-        "billing:GetIAMAccessPreference",
-        "billing:GetSellerOfRecord",
+        "billing:GetBillingData", "billing:GetBillingDetails",
+        "billing:GetBillingNotifications", "billing:GetBillingPreferences",
+        "billing:GetContractInformation", "billing:GetCredits",
+        "billing:GetIAMAccessPreference", "billing:GetSellerOfRecord",
         "billing:ListBillingViews"
       ],
       "Resource": "*"
@@ -117,9 +104,7 @@ cat > /tmp/billing-policy.json << 'EOF'
     {
       "Sid": "AllowAccountInformation",
       "Effect": "Allow",
-      "Action": [
-        "account:GetAccountInformation"
-      ],
+      "Action": ["account:GetAccountInformation"],
       "Resource": "*"
     },
     {
@@ -141,25 +126,25 @@ aws iam create-policy \
   --policy-name "$POLICY_NAME" \
   --policy-document file:///tmp/billing-policy.json \
   --description "Policy for viewing billing information and cost data" \
-  >/dev/null 2>&1 || echo "[WARN] 策略创建失败"
+  >/dev/null 2>&1 || { echo "[ERROR] 策略创建失败"; exit 1; }
 
-# 附加策略
+echo "[4/4] 附加策略到用户..."
 aws iam attach-user-policy \
   --user-name "$USERNAME" \
   --policy-arn "$POLICY_ARN" \
-  >/dev/null 2>&1 || echo "[WARN] 策略附加失败"
+  >/dev/null 2>&1 || { echo "[ERROR] 策略附加失败"; exit 1; }
 
 rm -f /tmp/billing-policy.json
 
-# 输出关键信息
 echo ""
-echo "=================================================="
-echo "  控制台URL : https://${ACCOUNT_ID}.signin.aws.amazon.com/console"
-echo "  用户名    : $USERNAME"
-echo "  密码      : $PASSWORD"
-echo "=================================================="
+echo -e "${GREEN}===================================================${NC}"
+echo -e "${GREEN}  创建成功!${NC}"
+echo -e "${GREEN}  控制台URL : https://${ACCOUNT_ID}.signin.aws.amazon.com/console${NC}"
+echo -e "${GREEN}  用户名    : ${USERNAME}${NC}"
+echo -e "${GREEN}  密码      : ${PASSWORD}${NC}"
+echo -e "${GREEN}  (首次登录需要修改密码)${NC}"
+echo -e "${GREEN}===================================================${NC}"
 echo ""
-echo "[NOTE] 首次登录需要修改密码"
-echo "[NOTE] 如果 IAM 用户无法查看账单，需要 root 用户在控制台开启:"
-echo "       Account -> IAM User and Role Access to Billing Information -> Activate IAM Access"
-echo "       https://us-east-1.console.aws.amazon.com/billing/home#/account"
+echo -e "${YELLOW}[NOTE] 如果 IAM 用户无法查看账单，需要 root 用户在控制台开启:${NC}"
+echo -e "${YELLOW}       Account -> IAM User and Role Access to Billing Information -> Activate IAM Access${NC}"
+echo -e "${YELLOW}       https://us-east-1.console.aws.amazon.com/billing/home#/account${NC}"
