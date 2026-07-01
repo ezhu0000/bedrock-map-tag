@@ -56,6 +56,8 @@ US_REGIONS=("us-east-1" "us-east-2" "us-west-2")
 MODELS=(
   "usclaudesonnet5|us.anthropic.claude-sonnet-5"
   "globalclaudesonnet5|global.anthropic.claude-sonnet-5"
+  "usclaudefable5|us.anthropic.claude-fable-5"
+  "globalclaudefable5|global.anthropic.claude-fable-5"
   "usclaudesonnet46|us.anthropic.claude-sonnet-4-6"
   "globalclaudesonnet46|global.anthropic.claude-sonnet-4-6"
   "usclaudeopus48|us.anthropic.claude-opus-4-8"
